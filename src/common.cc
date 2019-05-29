@@ -107,6 +107,9 @@ namespace sharp {
   bool IsWebp(std::string const &str) {
     return EndsWith(str, ".webp") || EndsWith(str, ".WEBP");
   }
+  bool IsGif(std::string const &str) {
+    return EndsWith(str, ".gif") || EndsWith(str, ".GIF");
+  }
   bool IsTiff(std::string const &str) {
     return EndsWith(str, ".tif") || EndsWith(str, ".tiff") || EndsWith(str, ".TIF") || EndsWith(str, ".TIFF");
   }
@@ -401,6 +404,17 @@ namespace sharp {
     } else if (imageType == ImageType::WEBP) {
       if (image.width() > 16383 || image.height() > 16383) {
         throw vips::VError("Processed image is too large for the WebP format");
+      }
+    } else if (imageType == ImageType::GIF) {
+      if (image.width() > 65535) {
+        throw vips::VError("Processed image is too large for the GIF format. Width cannot be larger than 65535 pixels.");
+      }
+      if (image.get_typeof(VIPS_META_PAGE_HEIGHT) == G_TYPE_INT) {
+        if (image.get_int(VIPS_META_PAGE_HEIGHT) > 65535) {
+          throw vips::VError("Processed image is too large for the GIF format. Page height cannot be larger than 65535 pixels.");
+        }
+      } else if (image.height() > 65535) {
+        throw vips::VError("Processed image is too large for the GIF format. Height cannot be larger than 65535 pixels.");
       }
     }
   }

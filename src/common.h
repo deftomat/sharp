@@ -122,6 +122,7 @@ namespace sharp {
   bool IsJpeg(std::string const &str);
   bool IsPng(std::string const &str);
   bool IsWebp(std::string const &str);
+  bool IsGif(std::string const &str);
   bool IsTiff(std::string const &str);
   bool IsDz(std::string const &str);
   bool IsDzZip(std::string const &str);

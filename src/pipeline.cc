@@ -695,6 +695,31 @@ class PipelineWorker : public Nan::AsyncWorker {
       baton->channels = image.bands();
       baton->width = image.width();
       baton->height = image.height();
+
+      // Animated image properties
+      if (baton->pageHeight == 0) {
+        if (image.get_typeof(VIPS_META_PAGE_HEIGHT) == G_TYPE_INT) {
+          baton->pageHeight = image.get_int(VIPS_META_PAGE_HEIGHT);
+        } else {
+          baton->pageHeight = baton->height;
+        }
+      }
+      if (baton->pageDelay == -1) {
+        if (image.get_typeof("gif-delay") == G_TYPE_INT) {
+          baton->pageDelay = image.get_int("gif-delay");
+        } else {
+          baton->pageDelay = 0;
+        }
+      }
+      if (baton->pageLoop == -1) {
+        if (image.get_typeof("gif-loop") == G_TYPE_INT) {
+          baton->pageLoop = image.get_int("gif-loop");
+        } else {
+          baton->pageLoop = 0;
+        }
+      }
+      baton->pageLoop = baton->pageLoop + 1; // TODO: https://github.com/libvips/libvips/issues/1302
+
       // Output
       if (baton->fileOut.empty()) {
         // Buffer output
@@ -722,7 +747,7 @@ class PipelineWorker : public Nan::AsyncWorker {
             baton->channels = std::min(baton->channels, 3);
           }
         } else if (baton->formatOut == "png" || (baton->formatOut == "input" &&
-          (inputImageType == ImageType::PNG || inputImageType == ImageType::GIF || inputImageType == ImageType::SVG))) {
+          (inputImageType == ImageType::PNG || inputImageType == ImageType::SVG))) {
           // Write PNG to buffer
           sharp::AssertImageTypeDimensions(image, ImageType::PNG);
           VipsArea *area = VIPS_AREA(image.pngsave_buffer(VImage::option()
@@ -753,6 +778,20 @@ class PipelineWorker : public Nan::AsyncWorker {
           area->free_fn = nullptr;
           vips_area_unref(area);
           baton->formatOut = "webp";
+        } else if (baton->formatOut == "gif" || (baton->formatOut == "input" && inputImageType == ImageType::GIF)) {
+          // Write GIF to buffer
+          image.set("page-height", baton->pageHeight);
+          image.set("gif-delay", baton->pageDelay);
+          image.set("gif-loop", baton->pageLoop);
+          sharp::AssertImageTypeDimensions(image, ImageType::GIF);
+          VipsArea *area = VIPS_AREA(image.magicksave_buffer(VImage::option()
+            ->set("strip", !baton->withMetadata)
+            ->set("format", "gif")));
+          baton->bufferOut = static_cast<char*>(area->data);
+          baton->bufferOutLength = area->length;
+          area->free_fn = nullptr;
+          vips_area_unref(area);
+          baton->formatOut = "gif";
         } else if (baton->formatOut == "tiff" || (baton->formatOut == "input" && inputImageType == ImageType::TIFF)) {
           // Write TIFF to buffer
           if (baton->tiffCompression == VIPS_FOREIGN_TIFF_COMPRESSION_JPEG) {
@@ -813,12 +852,13 @@ class PipelineWorker : public Nan::AsyncWorker {
         bool const isJpeg = sharp::IsJpeg(baton->fileOut);
         bool const isPng = sharp::IsPng(baton->fileOut);
         bool const isWebp = sharp::IsWebp(baton->fileOut);
+        bool const isGif = sharp::IsGif(baton->fileOut);
         bool const isTiff = sharp::IsTiff(baton->fileOut);
         bool const isDz = sharp::IsDz(baton->fileOut);
         bool const isDzZip = sharp::IsDzZip(baton->fileOut);
         bool const isV = sharp::IsV(baton->fileOut);
         bool const mightMatchInput = baton->formatOut == "input";
-        bool const willMatchInput = mightMatchInput && !(isJpeg || isPng || isWebp || isTiff || isDz || isDzZip || isV);
+        bool const willMatchInput = mightMatchInput && !(isJpeg || isPng || isWebp || isGif || isTiff || isDz || isDzZip || isV);
         if (baton->formatOut == "jpeg" || (mightMatchInput && isJpeg) ||
           (willMatchInput && inputImageType == ImageType::JPEG)) {
           // Write JPEG to file
@@ -836,7 +876,7 @@ class PipelineWorker : public Nan::AsyncWorker {
           baton->formatOut = "jpeg";
           baton->channels = std::min(baton->channels, 3);
         } else if (baton->formatOut == "png" || (mightMatchInput && isPng) || (willMatchInput &&
-          (inputImageType == ImageType::PNG || inputImageType == ImageType::GIF || inputImageType == ImageType::SVG))) {
+          (inputImageType == ImageType::PNG || inputImageType == ImageType::SVG))) {
           // Write PNG to file
           sharp::AssertImageTypeDimensions(image, ImageType::PNG);
           image.pngsave(const_cast<char*>(baton->fileOut.data()), VImage::option()
@@ -860,6 +900,17 @@ class PipelineWorker : public Nan::AsyncWorker {
             ->set("near_lossless", baton->webpNearLossless)
             ->set("alpha_q", baton->webpAlphaQuality));
           baton->formatOut = "webp";
+        } else if (baton->formatOut == "gif" || (mightMatchInput && isGif) ||
+          (willMatchInput && inputImageType == ImageType::GIF)) {
+          // Write GIF to file
+          image.set("page-height", baton->pageHeight);
+          image.set("gif-delay", baton->pageDelay);
+          image.set("gif-loop", baton->pageLoop);
+          sharp::AssertImageTypeDimensions(image, ImageType::GIF);
+          image.magicksave(const_cast<char*>(baton->fileOut.data()), VImage::option()
+            ->set("strip", !baton->withMetadata)
+            ->set("format", "gif"));
+          baton->formatOut = "gif";
         } else if (baton->formatOut == "tiff" || (mightMatchInput && isTiff) ||
           (willMatchInput && inputImageType == ImageType::TIFF)) {
           // Write TIFF to file
@@ -1320,6 +1371,16 @@ NAN_METHOD(pipeline) {
   vips_enum_from_nick(nullptr, VIPS_TYPE_FOREIGN_TIFF_PREDICTOR,
     AttrAsStr(options, "tiffPredictor").data()));
 
+  // Animated output
+  if (HasAttr(options, "pageHeight")) {
+    baton->pageHeight = AttrTo<uint32_t>(options, "pageHeight");
+  }
+  if (HasAttr(options, "pageDelay")) {
+    baton->pageDelay = AttrTo<int32_t>(options, "pageDelay");    
+  }
+  if (HasAttr(options, "pageLoop")) {
+    baton->pageLoop = AttrTo<int32_t>(options, "pageLoop");
+  }
   // Tile output
   baton->tileSize = AttrTo<uint32_t>(options, "tileSize");
   baton->tileOverlap = AttrTo<uint32_t>(options, "tileOverlap");
