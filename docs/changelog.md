@@ -4,7 +4,7 @@
 
 Requires libvips v8.7.4.
 
-#### v0.22.1 - TBD
+#### v0.22.1 - 25<sup>th</sup> April 2019
 
 * Add `modulate` operation for brightness, saturation and hue.
   [#1601](https://github.com/lovell/sharp/pull/1601)
@@ -13,6 +13,9 @@ Requires libvips v8.7.4.
 * Improve help messaging should `require("sharp")` fail.
   [#1638](https://github.com/lovell/sharp/pull/1638)
   [@sidharthachatterjee](https://github.com/sidharthachatterjee)
+
+* Add support for Node 12.
+  [#1668](https://github.com/lovell/sharp/issues/1668)
 
 #### v0.22.0 - 18<sup>th</sup> March 2019
 

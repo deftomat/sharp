@@ -15,7 +15,7 @@ yarn add sharp
 ### Building from source
 
 Pre-compiled binaries for sharp are provided for use with
-Node versions 6, 8, 10 and 11 on
+Node versions 6, 8, 10, 11 and 12 on
 64-bit Windows, OS X and Linux platforms.
 
 Sharp will be built from source at install time when:
@@ -43,7 +43,7 @@ Most Linux-based (glibc, musl) operating systems running on x64 and ARMv6+ CPUs 
 * Debian 7+
 * Ubuntu 14.04+
 * Centos 7+
-* Alpine 3.8+ (Node 8 and 10)
+* Alpine 3.8+ (Node 8+)
 * Fedora
 * openSUSE 13.2+
 * Archlinux
@@ -73,7 +73,7 @@ libvips is available in the
 
 ```sh
 apk add vips-dev fftw-dev build-base --update-cache \
-    --repository https://alpine.global.ssl.fastly.net/alpine/edge/testing/ \
+    --repository https://alpine.global.ssl.fastly.net/alpine/edge/community/ \
     --repository https://alpine.global.ssl.fastly.net/alpine/edge/main
 ```
 
