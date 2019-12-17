@@ -138,6 +138,9 @@ struct PipelineBaton {
   int webpAlphaQuality;
   bool webpNearLossless;
   bool webpLossless;
+  int webpReductionEffort;
+  bool webpMinSize;
+  bool webpSmartSubsample;
   int tiffQuality;
   VipsForeignTiffCompression tiffCompression;
   VipsForeignTiffPredictor tiffPredictor;
@@ -164,7 +167,8 @@ struct PipelineBaton {
   bool ensureAlpha;
   VipsInterpretation colourspace;
   int pageHeight;
-  int pageDelay;
+  int *pageDelay;
+  int pageDelayLength;
   int pageLoop;
   int tileSize;
   int tileOverlap;
@@ -240,6 +244,9 @@ struct PipelineBaton {
     pngColours(256),
     pngDither(1.0),
     webpQuality(80),
+    webpReductionEffort(2),
+    webpMinSize(false),
+    webpSmartSubsample(false),
     tiffQuality(80),
     tiffCompression(VIPS_FOREIGN_TIFF_COMPRESSION_JPEG),
     tiffPredictor(VIPS_FOREIGN_TIFF_PREDICTOR_HORIZONTAL),
@@ -264,7 +271,8 @@ struct PipelineBaton {
     ensureAlpha(false),
     colourspace(VIPS_INTERPRETATION_LAST),
     pageHeight(0),
-    pageDelay(-1),
+    pageDelay(NULL),
+    pageDelayLength(-1),
     pageLoop(-1),
     tileSize(256),
     tileOverlap(0),

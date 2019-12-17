@@ -224,6 +224,7 @@ namespace sharp {
   bool ImageTypeSupportsPage(ImageType imageType) {
     return
       imageType == ImageType::GIF ||
+      imageType == ImageType::WEBP ||
       imageType == ImageType::TIFF ||
       imageType == ImageType::PDF;
   }

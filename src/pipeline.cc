@@ -704,21 +704,16 @@ class PipelineWorker : public Nan::AsyncWorker {
           baton->pageHeight = baton->height;
         }
       }
-      if (baton->pageDelay == -1) {
-        if (image.get_typeof("gif-delay") == G_TYPE_INT) {
-          baton->pageDelay = image.get_int("gif-delay");
-        } else {
-          baton->pageDelay = 0;
+      if (baton->pageDelay == NULL) {
+        if (image.get_typeof("delay") == VIPS_TYPE_ARRAY_INT) {
+          image.get_array_int("delay", &baton->pageDelay, &baton->pageDelayLength);
         }
       }
       if (baton->pageLoop == -1) {
         if (image.get_typeof("gif-loop") == G_TYPE_INT) {
           baton->pageLoop = image.get_int("gif-loop");
-        } else {
-          baton->pageLoop = 0;
         }
       }
-      baton->pageLoop = baton->pageLoop + 1; // TODO: https://github.com/libvips/libvips/issues/1302
 
       // Output
       if (baton->fileOut.empty()) {
@@ -766,12 +761,22 @@ class PipelineWorker : public Nan::AsyncWorker {
           baton->formatOut = "png";
         } else if (baton->formatOut == "webp" || (baton->formatOut == "input" && inputImageType == ImageType::WEBP)) {
           // Write WEBP to buffer
+          image.set("page-height", baton->pageHeight);
+          if (baton->pageLoop != -1) {
+            image.set("gif-loop", baton->pageLoop);
+          }
+          if (baton->pageDelay != NULL) {
+            image.set("delay", baton->pageDelay, baton->pageDelayLength);
+          }
           sharp::AssertImageTypeDimensions(image, ImageType::WEBP);
           VipsArea *area = VIPS_AREA(image.webpsave_buffer(VImage::option()
             ->set("strip", !baton->withMetadata)
             ->set("Q", baton->webpQuality)
             ->set("lossless", baton->webpLossless)
             ->set("near_lossless", baton->webpNearLossless)
+            ->set("reduction_effort", baton->webpReductionEffort)
+            ->set("min_size", baton->webpMinSize)
+            ->set("smart_subsample", baton->webpSmartSubsample)
             ->set("alpha_q", baton->webpAlphaQuality)));
           baton->bufferOut = static_cast<char*>(area->data);
           baton->bufferOutLength = area->length;
@@ -781,8 +786,12 @@ class PipelineWorker : public Nan::AsyncWorker {
         } else if (baton->formatOut == "gif" || (baton->formatOut == "input" && inputImageType == ImageType::GIF)) {
           // Write GIF to buffer
           image.set("page-height", baton->pageHeight);
-          image.set("gif-delay", baton->pageDelay);
-          image.set("gif-loop", baton->pageLoop);
+          if (baton->pageLoop != -1) {
+            image.set("gif-loop", baton->pageLoop);
+          }
+          if (baton->pageDelay != NULL) {
+            image.set("delay", baton->pageDelay, baton->pageDelayLength);
+          }
           sharp::AssertImageTypeDimensions(image, ImageType::GIF);
           VipsArea *area = VIPS_AREA(image.magicksave_buffer(VImage::option()
             ->set("strip", !baton->withMetadata)
@@ -892,20 +901,34 @@ class PipelineWorker : public Nan::AsyncWorker {
         } else if (baton->formatOut == "webp" || (mightMatchInput && isWebp) ||
           (willMatchInput && inputImageType == ImageType::WEBP)) {
           // Write WEBP to file
+          image.set("page-height", baton->pageHeight);
+          if (baton->pageLoop != -1) {
+            image.set("gif-loop", baton->pageLoop);
+          }
+          if (baton->pageDelay != NULL) {
+            image.set("delay", baton->pageDelay, baton->pageDelayLength);
+          }
           sharp::AssertImageTypeDimensions(image, ImageType::WEBP);
           image.webpsave(const_cast<char*>(baton->fileOut.data()), VImage::option()
             ->set("strip", !baton->withMetadata)
             ->set("Q", baton->webpQuality)
             ->set("lossless", baton->webpLossless)
             ->set("near_lossless", baton->webpNearLossless)
+            ->set("reduction_effort", baton->webpReductionEffort)
+            ->set("min_size", baton->webpMinSize)
+            ->set("smart_subsample", baton->webpSmartSubsample)
             ->set("alpha_q", baton->webpAlphaQuality));
           baton->formatOut = "webp";
         } else if (baton->formatOut == "gif" || (mightMatchInput && isGif) ||
           (willMatchInput && inputImageType == ImageType::GIF)) {
           // Write GIF to file
           image.set("page-height", baton->pageHeight);
-          image.set("gif-delay", baton->pageDelay);
-          image.set("gif-loop", baton->pageLoop);
+          if (baton->pageLoop != -1) {
+            image.set("gif-loop", baton->pageLoop);
+          }
+          if (baton->pageDelay != NULL) {
+            image.set("delay", baton->pageDelay, baton->pageDelayLength);
+          }
           sharp::AssertImageTypeDimensions(image, ImageType::GIF);
           image.magicksave(const_cast<char*>(baton->fileOut.data()), VImage::option()
             ->set("strip", !baton->withMetadata)
@@ -1355,6 +1378,15 @@ NAN_METHOD(pipeline) {
   baton->webpAlphaQuality = AttrTo<uint32_t>(options, "webpAlphaQuality");
   baton->webpLossless = AttrTo<bool>(options, "webpLossless");
   baton->webpNearLossless = AttrTo<bool>(options, "webpNearLossless");
+  if (HasAttr(options, "webpReductionEffort")) {
+    baton->webpReductionEffort = AttrTo<uint32_t>(options, "webpReductionEffort");
+  }
+  if (HasAttr(options, "webpMinSize")) {
+    baton->webpMinSize = AttrTo<bool>(options, "webpMinSize");
+  }
+  if (HasAttr(options, "webpSmartSubsample")) {
+    baton->webpSmartSubsample = AttrTo<bool>(options, "webpSmartSubsample");
+  }
   baton->tiffQuality = AttrTo<uint32_t>(options, "tiffQuality");
   baton->tiffPyramid = AttrTo<bool>(options, "tiffPyramid");
   baton->tiffSquash = AttrTo<bool>(options, "tiffSquash");
@@ -1376,7 +1408,12 @@ NAN_METHOD(pipeline) {
     baton->pageHeight = AttrTo<uint32_t>(options, "pageHeight");
   }
   if (HasAttr(options, "pageDelay")) {
-    baton->pageDelay = AttrTo<int32_t>(options, "pageDelay");    
+    v8::Local<v8::Array> delay = AttrAs<v8::Array>(options, "pageDelay");
+    baton->pageDelayLength = delay->Length();
+    baton->pageDelay = (int *) g_malloc(baton->pageDelayLength * sizeof(int));
+    for (int i = 0; i < baton->pageDelayLength; i++) {
+      baton->pageDelay[i] = AttrTo<int32_t>(delay, i);
+    }
   }
   if (HasAttr(options, "pageLoop")) {
     baton->pageLoop = AttrTo<int32_t>(options, "pageLoop");

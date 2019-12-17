@@ -77,9 +77,16 @@ class MetadataWorker : public Nan::AsyncWorker {
       if (image.get_typeof(VIPS_META_PAGE_HEIGHT) == G_TYPE_INT) {
         baton->pageHeight = image.get_int(VIPS_META_PAGE_HEIGHT);
       }
-      if (image.get_typeof("gif-delay") == G_TYPE_INT) {
-        baton->pageDelay = image.get_int("gif-delay");
+      // TODO: use #define from header.h
+      if (image.get_typeof("delay") == VIPS_TYPE_ARRAY_INT) {
+        int *delay;
+        image.get_array_int("delay", &delay, &baton->pageDelayLength);
+        baton->pageDelay = (int *) g_malloc(baton->pageDelayLength * sizeof(int));
+        for (int i = 0; i < baton->pageDelayLength; i++) {
+          baton->pageDelay[i] = delay[i];
+        }
       }
+      // TODO: use #define from header.h
       if (image.get_typeof("gif-loop") == G_TYPE_INT) {
         baton->pageLoop = image.get_int("gif-loop");
       }
@@ -164,8 +171,13 @@ class MetadataWorker : public Nan::AsyncWorker {
       if (baton->pageHeight > 0) {
         Set(info, New("pageHeight").ToLocalChecked(), New<v8::Uint32>(baton->pageHeight));
       }
-      if (baton->pageDelay > -1) {
-        Set(info, New("pageDelay").ToLocalChecked(), New<v8::Uint32>(baton->pageDelay));
+      if (baton->pageDelay != NULL) {
+        v8::Local<v8::Array> delay = New<v8::Array>(baton->pageDelayLength);
+        for (int i = 0; i < baton->pageDelayLength; i++) {
+          delay->Set(i, New<v8::Uint32>(baton->pageDelay[i]));
+        }
+        g_free(baton->pageDelay);
+        Set(info, New("pageDelay").ToLocalChecked(), delay);
       }
       if (baton->pageLoop > -1) {
         Set(info, New("pageLoop").ToLocalChecked(), New<v8::Uint32>(baton->pageLoop));
